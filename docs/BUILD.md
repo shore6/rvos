@@ -36,11 +36,12 @@ qemu-system-riscv64 --version
 OpenSBI が動くかを確かめる。カーネルはまだないので、OpenSBI のバナーが出たあと止まれば成功である。
 
 ```bash
-qemu-system-riscv64 -machine virt -nographic -bios default
+qemu-system-riscv64 -machine virt -nographic -bios default -serial mon:stdio
 ```
 
 QEMU を抜けるには **Ctrl-A を押して離し、続けて X** を押す。
 バナーが出ず、ファームウェアが見つからないというエラーが出た場合は、`opensbi` パッケージが入っているかを確認する。
+なお、`-serial mon:stdio` を明示的に付けないと入力が効かなかった。
 
 ## 3. Rust の導入
 
