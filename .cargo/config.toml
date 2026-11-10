@@ -1,0 +1,2 @@
+[alias]
+kbuild = "build -p kernel --target riscv64gc-unknown-none-elf"

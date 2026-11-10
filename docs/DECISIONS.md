@@ -84,4 +84,37 @@
 
 ## M0
 
+### D-011：ツールチェーンは Rust 1.99.1 に固定する
+
+- 決定者：アシスタント（D-009 の方針の適用）
+- 内容：M0 着手時（2026-11-08）にインストールされていた stable が 1.99.1 だった。`rust-toolchain.toml` の `channel` にこの版を書き、`targets` に `riscv64gc-unknown-none-elf`、`components` に `clippy` と `llvm-tools` を入れる
+- 理由：版を固定しないと、`rustup update` のたびに警告や lint の挙動が変わり、レビューで見た状態と再現できなくなる
+- できなくなること：新しい stable の機能は、ここを書き換えるまで使えない。上げるときは理由をここに追記する
+
+### D-012：文字出力は SBI の Debug Console 拡張（DBCN）で行う
+
+- 決定者：ユーザー
+- 検討した案：DBCN ／ レガシー `console_putchar`（EID `0x01`）／ UART 16550 を直接叩く（xv6 の `uart.c` と同じ）
+- 理由：この環境で動くことを確かめた（SPEC 5.1）。`ecall` 1 回で 1 文字が出るので、以降のすべての実演の土台になる出力を最も早く用意できる（WORKFLOW 4.7）。レガシー拡張は SBI 仕様で非推奨であり、M7 の実機で使えない可能性がある
+- できなくなること：OpenSBI 1.2 より古いファームウェアでは文字が出ない。UART のレジスタを叩く経験は M6（受信割り込み）まで持ち越す。MMIO への volatile な書き込みは、D-013 の test デバイスで M0 のうちに経験する
+- 補足：起動直後に `probe_extension` で DBCN の有無を確かめる手もあるが、確かめた結果を「出力できない」と伝える手段がない。M0 では確かめない
+
+### D-013：QEMU の終了は、成功も失敗も test デバイス（`0x10_0000`）で行う
+
+- 決定者：ユーザー
+- 検討した案：test デバイスに一本化 ／ 成功は SBI の SRST、失敗は test デバイス
+- 理由：SRST では失敗を終了コードとして伝えられないことを実測で確かめた（SPEC 6.1）。経路を 1 本にすれば、`cargo krun` の正常終了と `cargo ktest` の失敗が同じコードを通るため、片方の書き間違いが他方で見つかる
+- できなくなること：QEMU 専用であり、実機では動かない。終了処理を 1 つの関数に閉じ込め、M7 でその中身だけを SRST に差し替える
+- xv6 との違い：xv6 は QEMU を自分で終了させず、ループで止まる。本プロジェクトは自動テストの結果を終了コードで受け取るため、終了させる必要がある
+
+### D-014：ビルド先のターゲットは `build.target` ではなく cargo エイリアスで指定する。リンカスクリプトは `kernel/build.rs` から渡す
+
+- 決定者：アシスタント
+- 内容：
+  - `.cargo/config.toml` に `[build] target = ...` を書かない。`kernel` を RISC-V 向けにビルドするのは `krun`、`ktest` などのエイリアスが `--target riscv64gc-unknown-none-elf` を付けて行う
+  - QEMU の起動は `[target.riscv64gc-unknown-none-elf] runner` に書く。`cargo run` と `cargo test` は、このターゲットの実行ファイルをこの runner に渡す
+  - リンカスクリプトは `kernel/build.rs` が `cargo:rustc-link-arg=-T<絶対パス>` で渡す
+- 理由：`build.target` を書くと `klib` のホスト向けテストまで RISC-V 向けになり、`cargo test -p klib` が動かない（パッケージごとにターゲットを変える `per-package-target` は nightly 専用で、D-009 により使えない）。リンカスクリプトを `rustflags` で渡すと相対パスがカレントディレクトリに左右されるが、`build.rs` なら `CARGO_MANIFEST_DIR` から絶対パスを組める。`kernel` 以外のクレートに渡ることもない
+- できなくなること：リポジトリの直下で素の `cargo build` を打つと、`kernel` がホスト向けにビルドされて失敗する。`kernel` は必ずエイリアス経由でビルドする
+
 （M0 の設計判断はここに追記する）

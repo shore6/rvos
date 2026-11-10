@@ -38,6 +38,16 @@ SBI に任せれば数行で済むが、UART を叩く経験は M6 の受信割�
 SBI のシステムリセット拡張（SRST）を使うか、`virt` の test デバイスに書き込むか。
 どちらで終了コードがホストに伝わるかは、実際に試してから決める。
 
+**決定**：文字出力は DBCN（D-012）、終了は test デバイス（D-013）。
+
+**進める順序**：
+
+1. ワークスペースと設定ファイル、`klib` のホスト側テスト 1 件、ビルドだけ通る `kernel`
+2. リンカスクリプト、`build.rs`、エントリ（`_start`）。gdb で `kmain` に届くこと、`a0` と `a1` の値を確かめる
+3. SBI 呼び出しの層、`print!` / `println!`、`#[panic_handler]`
+4. test デバイスによる終了と `cargo krun`
+5. `cargo ktest` の枠組みと、失敗するテストで非 0 になることの確認
+
 **参照先**：`kernel/entry.S`、`kernel/kernel.ld`、`kernel/printf.c`
 
 ## M1：トラップとタイマー
