@@ -123,6 +123,28 @@ gdb-multiarch <カーネルの ELF> -ex 'target remote :1234'
 | `info registers` | 汎用レジスタを表示する |
 | `p/x $scause` | CSR を 16 進で表示する |
 
+#### `.bss` の 0 クリアを確かめる
+
+QEMU の RAM は最初から 0 なので、0 クリアを忘れても症状が出ない（SPEC 10.3）。
+gdb で先にゴミを書き込んでから進めると確かめられる。
+
+```
+(gdb) set language c                       # リンカスクリプトのシンボルを名前で引けるようにする
+(gdb) b *0x80200000
+(gdb) c
+(gdb) set {long}&__bss_start = -1          # .bss の先頭に 0xffff_ffff_ffff_ffff を書く
+(gdb) set {long}&__bss_end = -1            # .bss の直後にも書く（越えて書いていないかの番人）
+(gdb) b kmain
+(gdb) c
+(gdb) x/2gx &__bss_start                   # .bss の先頭は 0 に、
+(gdb) x/gx &__bss_end                      # 直後は -1 のままなら正しい
+```
+
+`set language c` がないと、Rust の関数で止まっている間は gdb が Rust の名前の規則でシンボルを探すため、`No symbol '__bss_start' in current context` になる。
+切り替えたあとに出る `Warning: the current language does not match this frame.` は無視してよい。
+
+`.bss` が空（`__bss_start == __bss_end`）のときは、2 つの `set` が同じ場所に書く。このとき `kmain` に着いても -1 のままなら正しい。ループが 1 回も書き込まなかったことの確認になる。
+
 ### 5.3 バイナリを調べる
 
 ```bash
